@@ -1,0 +1,1 @@
+from src.datamodules.vision import ImageNetDataModule

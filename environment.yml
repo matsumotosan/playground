@@ -1,0 +1,11 @@
+name: play
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pytorch-lightning
+  - torchvision
+  - hydra-core
+  - matplotlib
+  - numpy
+prefix: /Users/shion/opt/anaconda3/envs/play
