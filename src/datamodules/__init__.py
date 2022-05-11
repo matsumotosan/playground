@@ -1,1 +1,5 @@
-from src.datamodules.vision import ImageNetDataModule
+from src.datamodules.vision import MNISTDataModule
+
+__all__ = [
+    'MNISTDataModule',
+]
