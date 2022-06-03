@@ -8,15 +8,28 @@ Simple experiments run on Google Colab notebooks.
 
 List of implementations and their status.
 
+### CNNs
+
+- [ ] AlexNet
+- [ ] ResNet
+- [ ] VGGNet
+- [ ] DenseNet
+
 ### Autoencoders
 
-- [] Vanilla autoencoder
-- [] Variational autoencoders (VAEs)
-- [] Vector-Quantized VAEs
+- [ ] Vanilla autoencoder
+- [ ] Variational autoencoders (VAE)
+- [ ] Vector-Quantized VAE (VQ-VAE)
+- [ ] Nouveau VAEs (NVAE)
 
 ### GANs
 
 - [x] Vanilla GAN
+
+### Federated Learning
+
+- [ ] Federated Averaging (FedAvg)
+- [ ] Federated SGD (FedSGD)
 
 ## Resources
 

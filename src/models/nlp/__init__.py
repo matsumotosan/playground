@@ -1,7 +1,7 @@
-from src.models.nlp.BERT import BERT
-from src.models.nlp.GPT import GPT
+# from src.models.nlp.BERT import BERT
+# from src.models.nlp.GPT import GPT
 
-__all__ = [
-    "BERT",
-    "GPT"
-]
+# __all__ = [
+#     "BERT",
+#     "GPT"
+# ]

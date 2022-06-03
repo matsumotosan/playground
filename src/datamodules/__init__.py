@@ -1,5 +1,5 @@
-from src.datamodules.vision import MNISTDataModule
+from .vision.mnist import MNISTDataModule
 
 __all__ = [
-    'MNISTDataModule',
+    "MNISTDataModule",
 ]

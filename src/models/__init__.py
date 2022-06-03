@@ -1,13 +1,6 @@
-from src.models.autoencoders import *
-from src.models.gan import GAN
-from src.models.nlp import *
-from src.models.vision import *
+from .autoencoders import *
+from .gan import GAN
+from .nlp import *
+from .vision import *
 
-__all__ = [
-    "AlexNet",
-    "BERT",
-    "GAN",
-    "ResNet",
-    "VAE",
-    "VGGNet"
-]
+__all__ = ["AlexNet", "BERT", "GAN", "ResNet", "VAE", "VGGNet"]
