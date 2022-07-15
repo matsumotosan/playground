@@ -21,6 +21,7 @@ List of implementations and their status.
 - [ ] Variational autoencoders (VAE)
 - [ ] Vector-Quantized VAE (VQ-VAE)
 - [ ] Nouveau VAEs (NVAE)
+- [ ] SwapVAE
 
 ### GANs
 
