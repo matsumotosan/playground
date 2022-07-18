@@ -1,4 +1,4 @@
-from src.models.autoencoders.VAE import VAE
+from src.models.autoencoders.vanilla_vae import VAE
 
 __all__ = [
     "VAE"

@@ -1,5 +1,9 @@
-# from src.models.autoencoders.VAE import VAE
+# from src.models.autoencoders.autoencoders import autoencoder
+from src.models.autoencoders.vanilla_vae import VAE
+from src.models.autoencoders.swap_vae import swapVAE
 
-# __all__ = [
-#     "VAE"
-# ]
+__all__ = [
+    "autoencoder",
+    "swapVAE",
+    "VAE"
+]

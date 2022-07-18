@@ -1,5 +1,5 @@
-from src.models.vision.AlexNet import AlexNet
-from src.models.vision.VGGNet import VGGNet
+from src.models.vision.alexnet import AlexNet
+from src.models.vision.vggnet import VGGNet
 
 __all__ = [
     "AlexNet",
