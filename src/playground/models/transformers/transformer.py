@@ -10,8 +10,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
-from types import Union
+from typing import Union
 
+
+__all__ = [
+    "Transformer",
+    "TransformerEncoder",
+    "TransformerDecoder",
+    "TransformerEncoderLayer",
+    "TransformerDecoderLayer"
+]
 
 class Transformer(pl.LightningModule):
     def __init__(
@@ -24,7 +32,6 @@ class Transformer(pl.LightningModule):
         dropout: float = 0.1,
         encoder: Union[None, nn.Module] = None,
         decoder: Union[None, nn.Module] = None,
-        generator: Union[None, nn.Module] = None,
         norm_first: bool = False
     ):
         super().__init__()
@@ -33,41 +40,33 @@ class Transformer(pl.LightningModule):
         self.d_model = d_model
         self.n_head = n_head
         
-        if encoder is not None:
-            self.encoder = encoder
-        else:
-            encoder_layer = TransformerEncoderLayer(
-                d_model,
-                n_head,
-                dim_feedforward,
-                dropout,
-                norm_first
-            )
-            self.encoder = TransformerEncoder(encoder_layer, n_encoder_layers)
-            
-        if decoder is not None:
-            self.decoder = decoder
-        else:
-            decoder_layer = TransformerDecoderLayer(
-                d_model,
-                n_head,
-                dim_feedforward,
-                dropout, 
-                norm_first
-            )
-            self.decoder = TransformerDecoder(decoder_layer, n_decoder_layers)
-            
-        self.generator = generator
+        self.encoder = (self._get_encoder(
+            d_model,
+            n_head,
+            n_encoder_layers,
+            dim_feedforward,
+            dropout,
+            norm_first
+        ) if encoder is None else encoder)
+
+        self.decoder = (self._get_decoder(
+            d_model,
+            n_head,
+            n_decoder_layers,
+            dim_feedforward,
+            dropout,
+            norm_first
+        ) if decoder is None else decoder)
     
     def encode(self, src, src_mask):
-        return self.encoder(self.src_embed(src), src_mask)
+        return self.encoder(src, src_mask)
     
-    def decode(self, memory, src_mask, tgt, tgt_mask):
-        self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
+    def decode(self, tgt, memory, tgt_mask, memory_mask):
+        self.decoder(tgt, memory, tgt_mask, memory_mask)
     
-    def forward(self, src, tgt, src_mask, tgt_mask):
+    def forward(self, src, tgt, src_mask=None, tgt_mask=None, memory_mask=None):
         memory = self.encode(src, src_mask)
-        output = self.decode(memory, src_mask, tgt, tgt_mask)
+        output = self.decode(tgt, memory, tgt_mask, memory_mask)
         return output
     
     def training_step(self, batch, batch_idx):
@@ -87,32 +86,57 @@ class Transformer(pl.LightningModule):
         scheduler = None
         return [optimizer], [scheduler]
 
+    @staticmethod
+    def _get_encoder(d_model, n_head, n_encoder_layers, dim_feedforward, dropout, norm_first):
+        encoder_layer = TransformerEncoderLayer(
+            d_model,
+            n_head,
+            dim_feedforward,
+            dropout,
+            norm_first
+        )
+        encoder = TransformerEncoder(encoder_layer, n_encoder_layers)
+        return encoder
+    
+    @staticmethod
+    def _get_decoder(d_model, n_head, n_decoder_layers, dim_feedforward, dropout, norm_first):
+        decoder_layer = TransformerEncoderLayer(
+            d_model,
+            n_head,
+            dim_feedforward,
+            dropout,
+            norm_first
+        )
+        decoder = TransformerDecoder(decoder_layer, n_decoder_layers)
+        return decoder
         
 class TransformerEncoder(nn.Module):
     """TransformerEncoder consists of a stack of N TransformerEncoderLayer layers."""
-    def __init__(self, layer, n_layers):
+    def __init__(self, encoder_layer, n_layers):
         super().__init__()
-        self.layers = _clone_layer(layer, n_layers)
-        self.norm = nn.LayerNorm(layer.size)
+        self.layers = _clone_layer(encoder_layer, n_layers)
+        # self.norm = nn.LayerNorm(encoder_layer.size)
     
-    def forward(self, x, mask):
+    def forward(self, src, src_mask):
+        x = src
         for layer in self.layers:
-            x = layer(x, mask)
-        x = self.norm(x)
+            x = layer(x, src_mask)
+        # x = self.norm(x)
         return x
 
 
 class TransformerDecoder(nn.Module):
     """TransformerDecoder consists of a stack of N TransformerDecoderLayer layers."""
-    def __init__(self, layer, n_layers):
+    def __init__(self, decoder_layer, n_layers):
         super().__init__()
-        self.layers = _clone_layer(layer, n_layers)
-        self.norm = nn.LayerNorm(layer.size)
+        self.layers = _clone_layer(decoder_layer, n_layers)
+        # self.norm = nn.LayerNorm(decoder_layer.size)
         
-    def forward(self, x, memory, src_mask, tgt_mask):
+    def forward(self, tgt, memory, tgt_mask, memory_mask):
+        x = tgt
         for l in self.layers:
-            x = l(x, memory, src_mask, tgt_mask)
-        x = self.norm(x)
+            x = l(x, memory, tgt_mask, memory_mask)
+        # x = self.norm(x)
         return x
 
 
@@ -149,9 +173,10 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout2 = nn.Dropout(dropout)
         self.norm_first = norm_first
 
-    def forward(self, x, mask):
+    def forward(self, src, mask):
         """Forward pass through an encoder layer. Provides option to perform LayerNorm operation 
         before or after self-attention and feed forward operations."""
+        x = src
         if self.norm_first:
             x = x + self._sa_block(self.norm1(x), mask)
             x = x + self._ff_block(self.norm2(x))
@@ -171,6 +196,7 @@ class TransformerEncoderLayer(nn.Module):
 class TransformerDecoderLayer(nn.Module):
     """TransformerDecoderLayer is composed of a self-attention, multi-head attentionm and feed-forward network."""
     def __init__(self, d_model, n_head, dim_feedforward, dropout, norm_first=False):
+        super().__init__()
         self.self_attention = SelfAttention(d_model, n_head)
         self.multihead_attention = SelfAttention(d_model, n_head)
         self.feed_forward = nn.Sequential(
@@ -212,16 +238,6 @@ class TransformerDecoderLayer(nn.Module):
         return self.dropout3(self.feed_forward(x))
 
 
-class Generator(nn.Module):
-    """Linear layer followed by softmax."""
-    def __init__(self, d_model, vocab):
-        super().__init__()
-        self.proj = nn.Linear(d_model, vocab)
-    
-    def forward(self, x):
-        return F.log_softmax(self.proj(x), dim=-1)
-
-
 class SelfAttention(nn.Module):
     """SelfAttention creates a multi-headed self-attention block
     
@@ -241,7 +257,7 @@ class SelfAttention(nn.Module):
         self.values = nn.Linear(self.d_k, self.d_k, bias=False)
         self.keys = nn.Linear(self.d_k, self.d_k, bias=False)
         self.queries = nn.Linear(self.d_k, self.d_k, bias=False)
-        self.fc_out = nn.Linear(self.d_model, self.d_model)
+        self.fc_out = nn.Linear(d_model, d_model)
     
     def forward(self, values, keys, queries, mask=None):
         """Performs self-attention operation
@@ -362,17 +378,3 @@ def generate_subsequent_mask(size):
     attn_shape = (size, size)
     subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
     return subsequent_mask == 0
-
-
-if __name__ == "__main__":
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    x = torch.Tensor([[1, 5, 2, 5, 3, 0, 2, 0], 
-                      [1, 6, 7, 2, 8, 7, 0, 2]]).to(device)
-    
-    tgt = torch.tensor([[1, 3, 5, 6, 3, 3, 0], 
-                        [1, 3, 6, 3, 8, 8, 2]]).to(device)
-    
-    model = Transformer().to(device)
-    out = model(x, tgt)
-    print(out.shape)
