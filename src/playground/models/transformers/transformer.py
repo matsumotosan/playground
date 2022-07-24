@@ -12,7 +12,6 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 from typing import Union
 
-
 __all__ = [
     "Transformer",
     "TransformerEncoder",
@@ -20,6 +19,7 @@ __all__ = [
     "TransformerEncoderLayer",
     "TransformerDecoderLayer"
 ]
+
 
 class Transformer(pl.LightningModule):
     def __init__(
@@ -382,28 +382,6 @@ class PositionalEncoding(nn.Module):
         x = x + self.pe[:, :x.size(1)].requires_grad_(False)
         return self.dropout(x)
 
-
-# class Sublayer(nn.Module):
-#     """Modular sublayer class for building encoder and decoder stacks.
-#     Output of each sublayer is LayerNorm(x + Sublayer(x)) where the Sublayer is a
-#     multi-head attention layer or a feed forward layer.
-    
-#     Parameters
-#     ----------
-#     size : int
-#         Output dimension of sublayer
-
-#     dropout : float
-#         Dropout probability
-#     """
-#     def __init__(self, size, dropout):
-#         super().__init__()
-#         self.norm = nn.LayerNorm(size)
-#         self.dropout = nn.Dropout(dropout)
-
-#     def forward(self, x, sublayer):
-#         return x + self.dropout(sublayer(self.norm(x)))
-#         # return self.norm(x + sublayer(x))
 
 def _clone_layer(layer, N):
     """Returns a ModuleList of N identical modules."""
