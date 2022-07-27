@@ -2,7 +2,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
 import pytorch_lightning as pl
 from typing import Union
 from copy import deepcopy
