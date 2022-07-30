@@ -51,20 +51,76 @@ class SwapVAE(pl.LightningModule):
         
         self.fc_mu = nn.Linear(self.hidden_dim[-1], self.latent_dim)
         self.fc_logvar = nn.Linear(self.hidden_dim[-1], self.latent_dim)
+    
+    def encode(self, x, concatenate=False):
+        """Forward pass through encoder.
         
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input vector
+        
+        concatenate : bool
+            If True, returns mu and logvar as a concatenated array.
+
+        Returns
+        -------
+        mu : torch.Tensor
+            Mean
+            
+        logvar : torch.Tensor
+            Log-variance
+        """
+        x = self.encoder(x)
+        mu, logvar = self.fc_mu(x), self.fc_logvar(x)
+        if concatenate:
+            return torch.cat((mu, logvar), 0)
+        else:
+            return mu, logvar
+    
+    def decode(self, z):
+        """Forward pass through decoder.
+        
+        Parameters
+        ----------
+        z : torch.Tensor
+            Latent vector
+        
+        Returns
+        -------
+        x_recon : torch.Tensor
+            Reconstructed input
+        """
+        x_recon = self.decoder(z)
+        return x_recon
+    
     def forward(self, x1, x2):
-        """Forward pass through SwapVAE architecture."""
-        # Encode x1 and x2
-        z1 = self.encoder(x1)
-        z2 = self.encoder(x2)
+        """Forward pass through SwapVAE architecture.
         
-        mu1, logvar1 = self.fc_mu(z1), self.fc_logvar(z1)
-        mu2, logvar2 = self.fc_mu(z1), self.fc_logvar(z2)
+        Parameters
+        ----------
+        x1 : torch.Tensor
+            First view of sample
+            
+        x2 : torch.Tensor
+            Second view of sample
+            
+        Returns
+        -------
+        x1_recon : torch.Tensor
+            Reconstruction of swapped first view
+        
+        x2_recon : torch.Tensor
+            Reconstruction of swapped second view
+        """
+        # Encode x1 and x2
+        mu1, logvar1 = self.encode(x1)
+        mu2, logvar2 = self.encode(x2)
         
         if self.reparameterize_first:
             # Reparameterization trick
-            s1 = self.reparameterize(mu1, logvar1)
-            s2 = self.reparameterize(mu2, logvar2)
+            z1 = self.reparameterize(mu1, logvar1)
+            z2 = self.reparameterize(mu2, logvar2)
             
             # Perform BlockSwap operation
             z1_new, z2_new = self.swap(z1, z2)
@@ -72,31 +128,33 @@ class SwapVAE(pl.LightningModule):
             pass
 
         # Decode z1_new and z2_new
-        x1_recon = self.decoder(z1_new)
-        x2_recon = self.decoder(z2_new)
+        x1_recon = self.decode(z1_new)
+        x2_recon = self.decode(z2_new)
         
-        # Calculate loss
-        loss1, loss_recon1, loss_style1, loss_align1 = self.calculate_loss(x1, x1_recon)
-        loss2, loss_recon2, loss_style2, loss_align2 = self.calculate_loss(x2, x2_recon)
-        
-        return None
+        return x1_recon, x2_recon
     
-    def training_step(self, batch, batch_idx):
-        loss, log = self.shared_step(batch, batch_idx)
-        return loss, log
-    
-    def validation_step(self, batch, batch_idx):
-        loss, log = self.shared_step(batch, batch_idx)
-        return loss, log
-
-    def test_step(self, batch, batch_idx):
-        pass
-    
-    def shared_step(self, batch, batch_idx):
-        x, _ = batch
+    def _step(self, batch, batch_idx):
+        x, y = batch
         loss = None
         log = None
-        return loss, log
+        
+        # Calculate loss
+        loss1, loss_recon1, loss_style1, loss_align1 = self.calculate_loss()
+        loss2, loss_recon2, loss_style2, loss_align2 = self.calculate_loss()
+        
+        logs = {
+            
+        }
+        
+        return loss, logs
+    
+    def training_step(self, batch, batch_idx):
+        loss, logs = self._step(batch, batch_idx)
+        return loss, logs
+    
+    def validation_step(self, batch, batch_idx):
+        loss, logs = self._step(batch, batch_idx)
+        return loss, logs
     
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(
@@ -105,7 +163,7 @@ class SwapVAE(pl.LightningModule):
         )
         
         scheduler = None
-        return [optimizer], [scheduler]
+        return optimizer, scheduler
     
     def swap(self, z1, z2):
         """Swaps content for two latent vectors.
@@ -131,8 +189,8 @@ class SwapVAE(pl.LightningModule):
         c2, s2 = self.decouple(z2)
         
         # Swap content for each latent vector
-        z1_new = torch.cat([c2, s1], dim=1)
-        z2_new = torch.cat([c1, s2], dim=1)
+        z1_new = torch.cat([c2, s1], 0)
+        z2_new = torch.cat([c1, s2], 0)
         
         return z1_new, z2_new
     
@@ -160,7 +218,7 @@ class SwapVAE(pl.LightningModule):
         Returns
         -------
         loss : float
-            Total loss
+            Sum of reconstruction loss, style space regularization loss, and content space alignment loss
         """
         loss_recon = reconstruction_loss(distribution=distribution)
         loss_style = kl_divergence()
@@ -186,7 +244,7 @@ class SwapVAE(pl.LightningModule):
         return nn.Sequential(*m)
 
     def _get_decoder(self):
-        dim = [*self.hidden_dim[::-1], self.input_dim]
+        dim = [self.latent_dim, *self.hidden_dim[::-1], self.input_dim]
         m = []
         for i in range(len(dim) - 1):
             m.append(nn.Linear(dim[i], dim[i + 1]))
@@ -199,15 +257,34 @@ def kl_divergence(mu, logvar):
     """Calculates KL divergence for given mean and log-variance."""
     return None
 
-def reconstruction_loss(x, x_hat, distribution='poisson'):
-    """Returns reconstruction loss."""
+
+def reconstruction_loss(x, x_recon, distribution='poisson'):
+    """Returns reconstruction loss for variey of distributions.
+    
+    Parameters
+    ----------
+    x : torch.Tensor
+        Original sample
+    
+    x_recon : torch.Tensor
+        Reconstructed sample
+    
+    distribution : str
+        Distribution
+        
+    Parmaeters
+    ----------
+    loss : torch.Tensor
+        Reconstruction loss based on specified distribution
+    """
     if distribution == 'poisson':
-        pass
+        loss = None
     elif distribution == 'gaussian' or distribution == 'l2':
-        pass
+        loss = None
     else:
-        pass
-    return None
+        raise NotImplementedError
+    return loss
+
 
 def alignment_loss(z1, z2):
     """Returns alignment loss."""
