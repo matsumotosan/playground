@@ -131,3 +131,9 @@ dmypy.json
 # vscode configs
 .vscode/
 .tmp.*
+
+# Data
+data/
+test/
+test.py
+lightning_logs/

@@ -22,8 +22,8 @@ class SwapVAE(pl.LightningModule):
         self,
         input_dim,
         hidden_dim: list[int],
-        content_dim: int,
-        style_dim: int,
+        content_dim: int = 16,
+        style_dim: int = 16,
         alpha: float = 1.0,
         beta: float = 1.0,
         learning_rate: float = 1e-2,
@@ -47,11 +47,10 @@ class SwapVAE(pl.LightningModule):
         self.reparameterize_first = reparameterize_first
         
         self.encoder = encoder if encoder is not None else self._get_encoder()
-        self.decoder = decoder if decoder is not None else self._get_decoder()
-        
         self.fc_mu = nn.Linear(self.hidden_dim[-1], self.latent_dim)
         self.fc_logvar = nn.Linear(self.hidden_dim[-1], self.latent_dim)
-    
+        self.decoder = decoder if decoder is not None else self._get_decoder()
+        
     def encode(self, x, concatenate=False):
         """Forward pass through encoder.
         
@@ -150,10 +149,12 @@ class SwapVAE(pl.LightningModule):
     
     def training_step(self, batch, batch_idx):
         loss, logs = self._step(batch, batch_idx)
+        self.log_dict({f"train_{k}": v for k, v in logs.items()}, on_step=True, on_epoch=False, prog_bar=True)
         return loss, logs
     
     def validation_step(self, batch, batch_idx):
         loss, logs = self._step(batch, batch_idx)
+        self.log_dict({f"val_{k}": v for k, v in logs.items()}, on_step=False, on_epoch=True, prog_bar=True)
         return loss, logs
     
     def configure_optimizers(self):
@@ -161,12 +162,10 @@ class SwapVAE(pl.LightningModule):
             self.parameters(),
             lr=self.learning_rate
         )
-        
-        scheduler = None
-        return optimizer, scheduler
+        return optimizer
     
     def swap(self, z1, z2):
-        """Swaps content for two latent vectors.
+        """Swaps content component of latent representations.
         
         Parameters
         ----------
@@ -222,10 +221,13 @@ class SwapVAE(pl.LightningModule):
         """
         loss_recon = reconstruction_loss(distribution=distribution)
         loss_style = kl_divergence()
-        if remove_loss_align:
-            pass
-        loss_align = alignment_loss()
+        loss_align = 0
+        
+        if not remove_loss_align:
+            loss_align = self.alpha * alignment_loss()
+        
         loss = loss_recon + self.beta * loss_style + self.alpha * loss_align
+            
         return loss, loss_recon, loss_style, loss_align
     
     def reparameterize(self, mu, logvar):

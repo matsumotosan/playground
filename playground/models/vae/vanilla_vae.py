@@ -3,7 +3,7 @@ from os import stat
 import pytorch_lightning as pl
 import torch
 from torch import nn
-from types import Union
+from typing import Union
 from pl_bolts.models.autoencoders.components import (
     resnet18_encoder,
     resnet18_decoder

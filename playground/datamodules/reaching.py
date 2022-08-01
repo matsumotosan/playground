@@ -1,10 +1,10 @@
+import numpy as np
 import pytorch_lightning as pl
 from torchvision import transforms
 from torch.utils.data import DataLoader, random_split
-from torchvision.datasets import MNIST
 
 
-class MNISTDataModule(pl.LightningDataModule):
+class SyntheticReachingDataModule(pl.LightningDataModule):
     def __init__(self, data_dir, batch_size, num_workers, transform=None):
         super().__init__()
         self.data_dir = data_dir
@@ -19,15 +19,14 @@ class MNISTDataModule(pl.LightningDataModule):
         self.num_classes = 10
 
     def prepare_data(self):
-        MNIST(self.data_dir, train=True, download=True)
-        MNIST(self.data_dir, train=False, download=True)
+        pass
 
     def setup(self, stage=None):
         if stage == "fit" or stage is None:
-            mnist_full = MNIST(self.data_dir, train=True)
-            self.mnist_train, self.mnist_val = random_split(mnist_full, [55000, 5000])
+            data = None
+            self.train_data, self.val_data = random_split(data, [55000, 5000])
         if stage == "test" or stage is None:
-            self.mnist_test = MNIST(self.data_dir, train=False)
+            self.test_data = None
 
     def train_dataloader(self):
         train_dl = DataLoader(
@@ -46,3 +45,33 @@ class MNISTDataModule(pl.LightningDataModule):
             self.mnist_test, batch_size=self.batch_size, num_workers=self.num_workers
         )
         return test_dl
+
+
+def generate_data(dim=2, a=5.0, b=0.3, l=4):
+    """Generate synthetic reaching dataset as described in SwapVAE by Dyer et al. (2021).
+    
+    Parameters
+    ----------
+    dim : int
+        Data dimensionality
+    
+    a : float
+        Scaling factor for Gaussians
+        
+    b : float
+        Scaling factor for variance
+        
+    l : int
+        Number of data points sampled within each cluster
+        
+    Returns
+    -------
+    pts : array of shape ()
+        Generated points
+    """
+    
+    return None
+
+
+def realnvp():
+    return None
