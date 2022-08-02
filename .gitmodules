@@ -1,0 +1,3 @@
+[submodule "third-party/SwapVAE"]
+	path = third-party/SwapVAE
+	url = https://github.com/nerdslab/SwapVAE.git

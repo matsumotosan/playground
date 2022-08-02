@@ -27,12 +27,12 @@ class SVHNDataModule(pl.LightningDataModule):
     def setup(self, stage=None) -> None:
         """Assign training, validation, and test data splits."""
         if stage == "fit" or stage is None:
-            svhn_full = SVHN(self.data_dir, train=True, transform=self.transform)
+            svhn_full = SVHN(self.data_dir, split='train', transform=self.transform)
             self.svhn_train, self.svhn_val = random_split(
                 svhn_full, [int(self.split * len(svhn_full)), len(svhn_full) - int(self.split * len(svhn_full))]
             )
         if stage == "test" or stage is None:
-            self.svhn_test = SVHN(self.data_dir, train=False, transform=self.transform)
+            self.svhn_test = SVHN(self.data_dir, split='test', transform=self.transform)
 
     def train_dataloader(self) -> DataLoader:
         """Returns training DataLoader."""
