@@ -30,8 +30,14 @@ class SwapVAE(pl.LightningModule):
         batchnorm: bool = False,
         encoder: Union[nn.Module, None] = None,
         decoder: Union[nn.Module, None] = None,
-        reparameterize_first: bool = True
+        reparameterize_first: bool = True,
+        recon_distribution: str = "poisson",
+        remove_alignment_loss : bool = False
     ) -> None:
+        """
+        Parameters
+        ----------
+        """
         super().__init__()
         self.save_hyperparameters()
         
@@ -40,12 +46,16 @@ class SwapVAE(pl.LightningModule):
         self.content_dim = content_dim
         self.style_dim = style_dim
         self.latent_dim = content_dim + style_dim
+        
         self.alpha = alpha
         self.beta = beta
         self.learning_rate = learning_rate
         self.batchnorm = batchnorm
         self.reparameterize_first = reparameterize_first
+        self.recon_distribution = recon_distribution
+        self.remove_alignment_loss = remove_alignment_loss
         
+        # Initialize architecture
         self.encoder = encoder if encoder is not None else self._get_encoder()
         self.fc_mu = nn.Linear(self.hidden_dim[-1], self.latent_dim)
         self.fc_logvar = nn.Linear(self.hidden_dim[-1], self.latent_dim)
@@ -132,37 +142,26 @@ class SwapVAE(pl.LightningModule):
         
         return x1_recon, x2_recon
     
-    def _step(self, batch, batch_idx):
-        x, y = batch
-        loss = None
-        log = None
+    def shared_step(self, batch, batch_idx):
+        (x1, x2), y = batch
+        
+        # Forward pass through model - self() is equivalent to self.forward()
+        x1_recon, x2_recon = self(x1, x2)
         
         # Calculate loss
-        loss1, loss_recon1, loss_style1, loss_align1 = self.calculate_loss()
-        loss2, loss_recon2, loss_style2, loss_align2 = self.calculate_loss()
-        
-        logs = {
-            
-        }
+        loss, logs = self.calculate_loss(x1, x2, x1_recon, x2_recon)
         
         return loss, logs
     
     def training_step(self, batch, batch_idx):
-        loss, logs = self._step(batch, batch_idx)
+        loss, logs = self.shared_step(batch, batch_idx)
         self.log_dict({f"train_{k}": v for k, v in logs.items()}, on_step=True, on_epoch=False, prog_bar=True)
         return loss, logs
     
     def validation_step(self, batch, batch_idx):
-        loss, logs = self._step(batch, batch_idx)
+        loss, logs = self.shared_step(batch, batch_idx)
         self.log_dict({f"val_{k}": v for k, v in logs.items()}, on_step=False, on_epoch=True, prog_bar=True)
         return loss, logs
-    
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(
-            self.parameters(),
-            lr=self.learning_rate
-        )
-        return optimizer
     
     def swap(self, z1, z2):
         """Swaps content component of latent representations.
@@ -200,10 +199,18 @@ class SwapVAE(pl.LightningModule):
         ----------
         z : torch.Tensor
             Latent vector
+            
+        Returns
+        -------
+        z_c : torch.Tensor
+            Content vector
+            
+        z_s : torch.Tensor
+            Style vector
         """
         return z[:self.content_dim], z[self.content_dim:]
     
-    def calculate_loss(self, distribution='poisson', remove_loss_align=False):
+    def calculate_loss(self, x1, x2, x1_recon, x2_recon):
         """Returns sum of reconstruction loss, style space regularization loss, and content space alignment loss.
         
         Parameters
@@ -219,11 +226,11 @@ class SwapVAE(pl.LightningModule):
         loss : float
             Sum of reconstruction loss, style space regularization loss, and content space alignment loss
         """
-        loss_recon = reconstruction_loss(distribution=distribution)
+        loss_recon = reconstruction_loss(distribution=self.recon_distribution)
         loss_style = kl_divergence()
         loss_align = 0
         
-        if not remove_loss_align:
+        if not self.remove_alignment_loss:
             loss_align = self.alpha * alignment_loss()
         
         loss = loss_recon + self.beta * loss_style + self.alpha * loss_align
@@ -234,6 +241,27 @@ class SwapVAE(pl.LightningModule):
         std = torch.exp(0.5 * logvar)
         eps = torch.randn_like(mu)
         return eps * std + mu
+    
+    def configure_optimizers(self):
+        if self.optim == "adam":
+            optimizer = torch.optim.Adam(
+                self.parameters(),
+                lr=self.learning_rate
+            )
+        elif self.optim == "":
+            pass
+        else:
+            raise NotImplementedError(f"Optimizer {self.optim} is not implemented.")
+        
+        scheduler = {
+            "scheduler": torch.optim.lr_scheduler.LambdaLR(
+                optimizer,
+            ),
+            "interval": "step",
+            "frequency": 1
+        }
+        
+        return [optimizer], [scheduler]
     
     def _get_encoder(self):
         dim = [self.input_dim, *self.hidden_dim]
@@ -254,6 +282,7 @@ class SwapVAE(pl.LightningModule):
                 m.append(nn.BatchNorm1d(dim[i + 1]))
             m.append(nn.ReLU(inplace=True))
         return nn.Sequential(*m)
+
 
 def kl_divergence(mu, logvar):
     """Calculates KL divergence for given mean and log-variance."""
