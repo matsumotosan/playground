@@ -61,4 +61,4 @@ class CIFAR10DataModule(pl.LightningDataModule):
 if __name__ == "__main__":
     cifar10 = CIFAR10DataModule(data_dir='./data/CIFAR10')
     cifar10.prepare_data()
-    # cifar10.setup()
+    cifar10.setup()
