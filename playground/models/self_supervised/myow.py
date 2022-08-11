@@ -8,6 +8,9 @@ from callbacks import BYOLExponentialMovingAverage
 class MYOW(pl.LightningModule):
     def __init__(
         self,
+        lam : float = 0.1,
+        k : int = 1,
+        L : int = 512,
         learning_rate : float = 0.03
     ):
         super().__init__()

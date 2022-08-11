@@ -7,6 +7,7 @@ from torch.nn import functional as F
 __all__ = [
     "ResNet",
     "_resnet18",
+    "_resnet18_cifar10"
     "_resnet34",
     "_resnet50",
     "_resnet101",
@@ -200,3 +201,8 @@ def _resnet101(in_channels=3, num_classes=1000):
 def _resnet152(in_channels=3, num_classes=1000):
     """Returns ResNet-152."""
     return ResNet(Bottleneck, [3, 8, 36, 3], in_channels, num_classes)
+
+
+def _resnet18_cifar10():
+    """Returns ResNet-18 modified for CIFAR10 as described in SimCLR."""
+    pass
